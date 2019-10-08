@@ -40,7 +40,10 @@ def preprocess_query(query, preprocess=None):
 		return tokens
 
 def cosine_similarity(a, b):
-	return np.dot(a, b)/ (norm(a)*norm(b))
+	dot_p = np.dot(a, b)
+	norm_a = norm(a, 2)
+	norm_b = norm(b, 2)
+	return dot_p / (norm_a*norm_b)
 
 
 def main():
@@ -85,7 +88,7 @@ def main():
 	print("[INFO: Computing cosine similarity between query vector and document vectors")
 	list_docs = []
 	for doc in doc_vectors:
-		list_docs.append((doc, cosine_similarity(query_vec, doc_vectors[doc]) ))
+		list_docs.append((doc, cosine_similarity(query_vec, doc_vectors[doc])))
 	
 	print("[INFO]: Top " + str(min(k, len(list_docs)))  + " results..")
 	i = 0
