@@ -55,7 +55,7 @@ def main():
 	start_time = time.time()
 
 	print("[INFO]: Preprocessing data using " + preprocess  + " operation..")
-	processed_query = preprocess_query(query)
+	processed_query = preprocess_query(query, preprocess)
 	print("[INFO: Processed query: " +  (" ").join(processed_query) )
 
 	print("[INFO: Creating query and document vectors")
