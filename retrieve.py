@@ -4,6 +4,7 @@ from porter_stemmer import PorterStemmer
 import time
 from train_lemma import *
 from collections import Counter
+from numpy.linalg import norm
 
 parser = argparse.ArgumentParser(description='Create an index from a collection of plain text documents')
 parser.add_argument('-i', required=True, help='path to index directory')
@@ -39,7 +40,7 @@ def preprocess_query(query, preprocess=None):
 		return tokens
 
 def cosine_similarity(a, b):
-	return np.dot(a, b)
+	return np.dot(a, b)/ (norm(a)*norm(b))
 
 
 def main():
