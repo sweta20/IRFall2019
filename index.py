@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description='Create an index from a collection 
 parser.add_argument('-d', required=True, help='path to the input file')
 parser.add_argument('-i', required=True, help='output index directory')
 
+flatten = lambda l: [item for sublist in l for item in sublist]
 
 def prepare_data(filename):
 	df = pd.read_csv(filename, header=0, encoding="ISO-8859-1")
@@ -31,36 +32,25 @@ def read_file(file_path):
 		data.append(tokens)
 	return data
 
-def create_vocab(data):
+def create_vocab(data, top_k=None):
 	print("[INFO]: Creating Vocab: ")
 	only_text = data.values()
 	flatten = lambda l: [item for sublist in l for item in sublist]
 	only_text = [flatten(para)  for para in only_text]
 	word_freq = Counter(chain(*only_text))
-	words = list(word_freq.keys())
-	print("Vocabulary created of size: " + str(len(words)))
-	id2word = {i : words[i] for i in range(len(words)) }
-	return id2word
+	print("Vocabulary created of size: " + str(len(word_freq)))
+	return word_freq
 
 def create_invertedindex_matrix(data):
-    id2word = create_vocab(data)
-    
-    word2id = {v: k for k, v in id2word.items()}
-    
-    inv_index = { i : {} for i in id2word.keys() }
-    for key in data.keys():
-        doc = data[key]
-        for para in doc:
-            for word in para:
-                if key not in inv_index[word2id[word]]:
-                    inv_index[word2id[word]][key] =1
-                else:
-                    inv_index[word2id[word]][key] +=1
-    for key in inv_index.keys():
-        inv_index[key] = sorted(inv_index[key].items(), key=lambda item: item[1], reverse=True)
+	df = create_vocab(data)
 
-    return inv_index, word2id
-
+	inv_index = { i : {} for i in df.keys() }
+	for key in data.keys():
+		tokens = Counter(flatten(data[key]))
+		all_tokens_doc = sum(tokens.values())
+		for word in tokens:
+			inv_index[word][key] = tokens[word]
+	return inv_index, df
 
 def preprocess_input(data, preprocess="stem", out_file=None):
 	encoder, decoder = load(n_letters, hidden_size, decoder_type="simple")
@@ -123,13 +113,15 @@ def main():
 	print("[INFO]: Preprocessing data using " + preprocess  + " operation..")
 	all_preprocessed = preprocess_input(processed, preprocess)
 
-	print("[INFO]: Creating index on preprocess data ")
-	inv_index, word2id = create_invertedindex_matrix(all_preprocessed)
+
+	print("[INFO]: Creating inverted index on preprocess data ")
+	inv_index, df = create_invertedindex_matrix(all_preprocessed)
 	print("Processed " + str(len(all_preprocessed)) + " documents.")
 
 	print("[INFO]: Saving index to directory: " + output_dir)
 	pickle.dump(inv_index, open(output_dir + "/invindex","wb"))
-	pickle.dump({"vocab": word2id, "preprocess" : preprocess, "N": len(all_preprocessed)}, open(output_dir + "/params",'wb'))
+	pickle.dump({"df": df, "preprocess" : preprocess, "N": len(all_preprocessed)}, open(output_dir + "/params_id",'wb'))
+
 
 if __name__ == '__main__':
 	main()
