@@ -42,15 +42,14 @@ def create_vocab(data, top_k=None):
 	return word_freq
 
 def create_invertedindex_matrix(data):
-	df = create_vocab(data)
-
-	inv_index = { i : {} for i in df.keys() }
+	word_freq = create_vocab(data)
+	inv_index = { i : {} for i in list(word_freq.keys()) }
 	for key in data.keys():
 		tokens = Counter(flatten(data[key]))
 		all_tokens_doc = sum(tokens.values())
 		for word in tokens:
 			inv_index[word][key] = tokens[word]
-	return inv_index, df
+	return inv_index, list(word_freq.keys())
 
 def preprocess_input(data, preprocess="stem", out_file=None):
 	encoder, decoder = load(n_letters, hidden_size, decoder_type="simple")
@@ -115,12 +114,12 @@ def main():
 
 
 	print("[INFO]: Creating inverted index on preprocess data ")
-	inv_index, df = create_invertedindex_matrix(all_preprocessed)
+	inv_index, words = create_invertedindex_matrix(all_preprocessed)
 	print("Processed " + str(len(all_preprocessed)) + " documents.")
 
 	print("[INFO]: Saving index to directory: " + output_dir)
 	pickle.dump(inv_index, open(output_dir + "/invindex","wb"))
-	pickle.dump({"df": df, "preprocess" : preprocess, "N": len(all_preprocessed)}, open(output_dir + "/params_id",'wb'))
+	pickle.dump({"vocab": words, "preprocess" : preprocess, "N": len(all_preprocessed)}, open(output_dir + "/params_id",'wb'))
 
 
 if __name__ == '__main__':

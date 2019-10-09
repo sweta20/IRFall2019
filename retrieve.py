@@ -13,7 +13,7 @@ parser.add_argument('-q', required=True, help='query')
 def load_index(dir_name):
 	inv_index = pickle.load( open(dir_name + "/invindex","rb"))
 	params = pickle.load( open(dir_name + "/params_id","rb"))
-	return inv_index, params["df"], params["preprocess"], params["N"]
+	return inv_index, params["vocab"], params["preprocess"], params["N"]
 
 def preprocess_query(query, preprocess=None):
 	encoder, decoder = load(n_letters, hidden_size, decoder_type="simple")
@@ -53,7 +53,7 @@ def main():
 	k = 10
 
 	print("[INFO]: Loading index from directory: " + index_dir)
-	inv_index, df, preprocess, N = load_index(index_dir)
+	inv_index, words, preprocess, N = load_index(index_dir)
 
 	start_time = time.time()
 
@@ -70,13 +70,13 @@ def main():
 	doc_vectors = {}
 
 	for i in range(len(unique_tokens)) :
-		n_docs = df[unique_tokens[i]] if unique_tokens[i] in df else 0
-		idf = np.log(N/(n_docs+1))
-		query_vec[i] = (float(query_word_counts[unique_tokens[i]]) / query_word_counts_total) * idf
-
 		token = unique_tokens[i]
-		if token in df:
+		if token in words:
 			docs = inv_index[token]
+			n_docs = len(docs)
+			idf = np.log(N/(n_docs+1))
+
+			query_vec[i] = (float(query_word_counts[unique_tokens[i]]) / query_word_counts_total) * idf
 
 			for doc_id, tf in docs.items():
 				if doc_id not in doc_vectors:
