@@ -5,20 +5,62 @@ import time
 from train_lemma import *
 from collections import Counter
 from numpy.linalg import norm
+from gensim import models
+from nltk.corpus import wordnet
 
 parser = argparse.ArgumentParser(description='Create an index from a collection of plain text documents')
 parser.add_argument('-i', required=True, help='path to index directory')
 parser.add_argument('-q', required=True, help='query')
+parser.add_argument('-e', action='store_true', help='embeddings based expansion')
+parser.add_argument('-l', action='store_true', help='wordnet based expansion')
+
 
 def load_index(dir_name):
 	inv_index = pickle.load( open(dir_name + "/invindex","rb"))
 	params = pickle.load( open(dir_name + "/params_id","rb"))
 	return inv_index, params["vocab"], params["preprocess"], params["N"]
 
-def preprocess_query(query, preprocess=None):
+def load_w2v():
+	print("[INFO]: Loading Word2Vec")
+	return models.KeyedVectors.load_word2vec_format(
+	'GoogleNews-vectors-negative300.bin', binary=True)
+
+def get_k_nearest_word2vec(query_tokens, k=5):
+	print("[INFO]: Expanding the query using nearest neighbors to query tokens")
+	neighbors = []
+	for token in query_tokens:
+		results = word2vec.similar_by_word(token)
+		neighbors.extend([x[0] for x in results])
+	counts = Counter(neighbors)
+	return [x[0] for x in counts.most_common(k)]
+
+def get_k_nearest_wordnet(query_tokens, k=5):
+	print("[INFO]: Expanding the query using wordnet")
+	synonyms = []
+	for token in query_tokens:
+		for syn in wordnet.synsets(token):
+			for lemma in syn.lemmas() :
+				if lemma.name() not in synonyms:
+					synonyms.append(lemma.name())
+	counts = Counter(synonyms)
+	return [x[0] for x in counts.most_common(k)]
+
+
+def preprocess_query(query, preprocess=None, expand=None):
 	encoder, decoder = load(n_letters, hidden_size, decoder_type="simple")
 	stemmer = PorterStemmer()
 	tokens = query.split(" ")
+
+	if expand == "e":
+		 query_tokens = get_k_nearest_word2vec(tokens)
+		 tokens += query_tokens
+
+	if expand == "l":
+		 query_tokens = get_k_nearest_wordnet(tokens)
+		 tokens += query_tokens
+
+	tokens = set(tokens)
+
 	if preprocess == "lemma":
 		lemmatized_tokens = []
 		for token in tokens:
@@ -50,15 +92,26 @@ def main():
 	args = parser.parse_args()
 	index_dir = args.i
 	query = args.q
+	embed_expansion_embed = args.e
+	embed_expansion_ling = args.l
+
 	k = 10
 
 	print("[INFO]: Loading index from directory: " + index_dir)
 	inv_index, words, preprocess, N = load_index(index_dir)
 
-	start_time = time.time()
+	if embed_expansion_embed:
+		global word2vec
+		word2vec = load_w2v()
 
+	if embed_expansion_embed:
+		embed_expansion = "e"
+	elif embed_expansion_ling:
+		embed_expansion = "l"
+
+	start_time = time.time()
 	print("[INFO]: Preprocessing data using " + preprocess  + " operation..")
-	processed_query = preprocess_query(query, preprocess)
+	processed_query = preprocess_query(query, preprocess, embed_expansion)
 	print("[INFO: Processed query: " +  (" ").join(processed_query) )
 
 	print("[INFO: Creating query and document vectors")
