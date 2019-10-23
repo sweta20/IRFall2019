@@ -59,6 +59,8 @@ def preprocess_query(query, preprocess=None, expand=None):
 		 query_tokens = get_k_nearest_wordnet(tokens)
 		 tokens += query_tokens
 
+	print("[INFO: query after expansion: " +  (" ").join(tokens) )
+
 	tokens = set(tokens)
 
 	if preprocess == "lemma":
@@ -87,32 +89,10 @@ def cosine_similarity(a, b):
 	norm_b = norm(b, 2)
 	return dot_p / (norm_a*norm_b)
 
-
-def main():
-	args = parser.parse_args()
-	index_dir = args.i
-	query = args.q
-	embed_expansion_embed = args.e
-	embed_expansion_ling = args.l
-
-	k = 10
-
-	print("[INFO]: Loading index from directory: " + index_dir)
-	inv_index, words, preprocess, N = load_index(index_dir)
-
-	if embed_expansion_embed:
-		global word2vec
-		word2vec = load_w2v()
-
-	if embed_expansion_embed:
-		embed_expansion = "e"
-	elif embed_expansion_ling:
-		embed_expansion = "l"
-
+def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5):
 	start_time = time.time()
 	print("[INFO]: Preprocessing data using " + preprocess  + " operation..")
 	processed_query = preprocess_query(query, preprocess, embed_expansion)
-	print("[INFO: Processed query: " +  (" ").join(processed_query) )
 
 	print("[INFO: Creating query and document vectors")
 	query_word_counts = Counter(processed_query)
@@ -146,11 +126,37 @@ def main():
 	print("[INFO]: Top " + str(min(k, len(list_docs)))  + " results..")
 	i = 0
 	for (doc_id, score) in sorted(list_docs, key=lambda item: item[1], reverse=True):
-		print(i, doc_id, score)
+		print(i, doc_id, "{0:.3f}".format(score))
 		i+=1
 		if i == k:
 			break
-	print("[INFO]: Process took  " +  "{0:.5f}".format(time.time() - start_time) + " seconds..")
+	print("[INFO]: Process took  " +  "{0:.2f}".format(time.time() - start_time) + " seconds..")
+
+def main():
+	args = parser.parse_args()
+	index_dir = args.i
+	# query = args.q
+	embed_expansion_embed = args.e
+	embed_expansion_ling = args.l
+
+	print("[INFO]: Loading index from directory: " + index_dir)
+	inv_index, words, preprocess, N = load_index(index_dir)
+
+	if embed_expansion_embed:
+		global word2vec
+		word2vec = load_w2v()
+
+	if embed_expansion_embed:
+		embed_expansion = "e"
+	elif embed_expansion_ling:
+		embed_expansion = "l"
+	else:
+		embed_expansion = "n"
+
+	for query in ["Health insurance", "Employee drug abuse", "Market stocks decline", "Obama republican",
+	"Business confidence Canada", "Gasoline prices hike", "Infosys company branch China", "Ivy league university competition grades",
+	"Shopping local deals", "Global warming health"]:
+		process_query(query, inv_index, words, preprocess, N, embed_expansion)
 	
 
 if __name__ == '__main__':
