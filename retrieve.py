@@ -7,6 +7,7 @@ from collections import Counter
 from numpy.linalg import norm
 from gensim import models
 from nltk.corpus import wordnet
+import pandas as pd
 
 parser = argparse.ArgumentParser(description='Create an index from a collection of plain text documents')
 parser.add_argument('-i', required=True, help='path to index directory')
@@ -14,6 +15,12 @@ parser.add_argument('-q', required=True, help='query')
 parser.add_argument('-e', action='store_true', help='embeddings based expansion')
 parser.add_argument('-l', action='store_true', help='wordnet based expansion')
 
+def prepare_data(filename):
+	df = pd.read_csv(filename, header=0, encoding="ISO-8859-1")
+	text = {}
+	for index, row in df.iterrows():
+		text[str(row['_unit_id'])] =  row['headline'] + " " + row['text'].replace("</br></br>","\n")
+	return text
 
 def load_index(dir_name):
 	inv_index = pickle.load( open(dir_name + "/invindex","rb"))
@@ -32,7 +39,7 @@ def get_k_nearest_word2vec(query_tokens, k=5):
 		results = word2vec.similar_by_word(token)
 		neighbors.extend([x[0] for x in results])
 	counts = Counter(neighbors)
-	return [x[0] for x in counts.most_common(k)]
+	return [x[0] for x in counts.most_common(k*len(query_tokens))]
 
 def get_k_nearest_wordnet(query_tokens, k=5):
 	print("[INFO]: Expanding the query using wordnet")
@@ -43,7 +50,8 @@ def get_k_nearest_wordnet(query_tokens, k=5):
 				if lemma.name() not in synonyms:
 					synonyms.append(lemma.name())
 	counts = Counter(synonyms)
-	return [x[0] for x in counts.most_common(k)]
+	print(counts)
+	return [x[0] for x in counts.most_common(k*len(query_tokens))]
 
 
 def preprocess_query(query, preprocess=None, expand=None):
@@ -99,7 +107,10 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 	query_word_counts_total = sum(query_word_counts.values())
 	unique_tokens = np.unique(processed_query)
 
-	query_vec = np.zeros(len(unique_tokens))
+	dictOfWords = { i : words[i] for i in range(0, len(words) ) }
+	invIndex = {v: k for k, v in dictOfWords.items()}
+
+	query_vec = np.zeros(len(words))
 	doc_vectors = {}
 
 	for i in range(len(unique_tokens)) :
@@ -109,14 +120,14 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 			n_docs = len(docs)
 			idf = np.log(N/(n_docs+1))
 
-			query_vec[i] = (float(query_word_counts[unique_tokens[i]]) / query_word_counts_total) * idf
+			query_vec[invIndex[token]] = (float(query_word_counts[unique_tokens[i]]) / query_word_counts_total) * idf
 
 			for doc_id, tf in docs.items():
-				if doc_id not in doc_vectors:
-					doc_vectors[doc_id] = np.zeros(len(unique_tokens))
-					doc_vectors[doc_id][i] = tf * idf
-				else:
-					doc_vectors[doc_id][i] = tf * idf
+				doc_vectors[doc_id] = np.zeros(len(words))
+				for j in range(len(words)):
+					if doc_id in inv_index[words[j]]:
+						doc_vectors[doc_id][j] = inv_index[words[j]][doc_id] * idf
+
 
 	print("[INFO: Computing cosine similarity between query vector and document vectors")
 	list_docs = []
@@ -126,6 +137,7 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 	print("[INFO]: Top " + str(min(k, len(list_docs)))  + " results..")
 	i = 0
 	for (doc_id, score) in sorted(list_docs, key=lambda item: item[1], reverse=True):
+		# print(i, doc_id, "{0:.3f}".format(score), all_data[doc_id], "\n\n")
 		print(i, doc_id, "{0:.3f}".format(score))
 		i+=1
 		if i == k:
@@ -135,7 +147,7 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 def main():
 	args = parser.parse_args()
 	index_dir = args.i
-	# query = args.q
+	query = args.q
 	embed_expansion_embed = args.e
 	embed_expansion_ling = args.l
 
@@ -146,6 +158,9 @@ def main():
 		global word2vec
 		word2vec = load_w2v()
 
+	# global all_data
+	# all_data = prepare_data("Full-Economic-News-DFE-839861.csv")
+
 	if embed_expansion_embed:
 		embed_expansion = "e"
 	elif embed_expansion_ling:
@@ -153,10 +168,10 @@ def main():
 	else:
 		embed_expansion = "n"
 
-	for query in ["Health insurance", "Employee drug abuse", "Market stocks decline", "Obama republican",
-	"Business confidence Canada", "Gasoline prices hike", "Infosys company branch China", "Ivy league university competition grades",
-	"Shopping local deals", "Global warming health"]:
-		process_query(query, inv_index, words, preprocess, N, embed_expansion)
+	# for query in ["Health insurance", "Employee drug abuse", "Market stocks decline", "Obama republican",
+	# "Business Canada", "Gasoline prices hike", "Infosys company branch China", "Ivy league university competition grades",
+	# "Shopping local deals", "Global warming health"]:
+	process_query(query, inv_index, words, preprocess, N, embed_expansion)
 	
 
 if __name__ == '__main__':
