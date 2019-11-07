@@ -8,12 +8,18 @@ from numpy.linalg import norm
 from gensim import models
 from nltk.corpus import wordnet
 import pandas as pd
+import re
+import os
+
+
+dict_file = "EsEn.pkl"
 
 parser = argparse.ArgumentParser(description='Create an index from a collection of plain text documents')
 parser.add_argument('-i', required=True, help='path to index directory')
 parser.add_argument('-q', required=True, help='query')
 parser.add_argument('-e', action='store_true', help='embeddings based expansion')
 parser.add_argument('-l', action='store_true', help='wordnet based expansion')
+parser.add_argument('-x', action='store_true', help='do query translation')
 
 def prepare_data(filename):
 	df = pd.read_csv(filename, header=0, encoding="ISO-8859-1")
@@ -144,12 +150,53 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 			break
 	print("[INFO]: Process took  " +  "{0:.2f}".format(time.time() - start_time) + " seconds..")
 
+
+def get_translation(query):
+	# pattern = r"(\w+)\t([\w+,\s]+)(\[\w+\])"
+	if not os.path.isfile(dict_file):
+		spanish_dict = {}
+		with open("Spanish.txt") as f:
+			for line in f:
+				try:
+					eng, spa = line.strip().split("\t")
+					translations = spa.split("[")[0].split(",")
+					pos = spa.split("[")[-1][:-1]
+					for spa in translations:
+						if spa in spanish_dict:
+							spanish_dict[spa].append(eng)
+						else:
+							spanish_dict[spa] = [eng]
+				except:
+					continue
+
+		with open(dict_file, 'wb') as handle:
+			pickle.dump(spanish_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+	with open('EsEn.pkl', 'rb') as handle:
+		spanish_dict = pickle.load(handle, encoding="latin-1") 
+	# print(spanish_dict)
+	
+	translated_query = []
+	for word in query.split():
+		try:
+			translated_query.extend(spanish_dict[word])
+		except:
+			continue
+
+	return (" ").join(translated_query)
+
+
 def main():
 	args = parser.parse_args()
 	index_dir = args.i
 	query = args.q
 	embed_expansion_embed = args.e
 	embed_expansion_ling = args.l
+	translate_query = args.x
+
+	if translate_query:
+		query = get_translation(query)
+		print("[INFO]: Translated query  " +  query)
 
 	print("[INFO]: Loading index from directory: " + index_dir)
 	inv_index, words, preprocess, N = load_index(index_dir)
