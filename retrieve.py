@@ -103,6 +103,27 @@ def cosine_similarity(a, b):
 	norm_b = norm(b, 2)
 	return dot_p / (norm_a*norm_b)
 
+def get_highlighted_text(doc, query, window=50):
+	colourFormat = '\033[{0}m'
+	colourStr = colourFormat.format(32)
+	resetStr = colourFormat.format(0)
+	lastMatch = 0
+	highlightedtext = ''
+	regex_query = ("|").join(query.split())
+	for match in re.finditer(regex_query, doc):
+	    start, end = match.span()
+	    if lastMatch+window != start:
+	    	highlightedtext += "..."
+	    highlightedtext += doc[start-window: start]
+	    highlightedtext += colourStr
+	    highlightedtext += doc[start: end]
+	    highlightedtext += resetStr
+	    highlightedtext += doc[end: end+window]
+	    lastMatch = end
+	highlightedtext += doc[lastMatch:]
+
+	return highlightedtext
+
 def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5):
 	start_time = time.time()
 	print("[INFO]: Preprocessing data using " + preprocess  + " operation..")
@@ -143,8 +164,8 @@ def process_query(query, inv_index, words, preprocess, N , embed_expansion, k=5)
 	print("[INFO]: Top " + str(min(k, len(list_docs)))  + " results..")
 	i = 0
 	for (doc_id, score) in sorted(list_docs, key=lambda item: item[1], reverse=True):
-		# print(i, doc_id, "{0:.3f}".format(score), all_data[doc_id], "\n\n")
-		print(i, doc_id, "{0:.3f}".format(score))
+		print(i, doc_id, "{0:.3f}".format(score), get_highlighted_text(all_data[doc_id], query), "\n\n")
+		# print(i, doc_id, "{0:.3f}".format(score))
 		i+=1
 		if i == k:
 			break
@@ -205,8 +226,8 @@ def main():
 		global word2vec
 		word2vec = load_w2v()
 
-	# global all_data
-	# all_data = prepare_data("Full-Economic-News-DFE-839861.csv")
+	global all_data
+	all_data = prepare_data("Full-Economic-News-DFE-839861.csv")
 
 	if embed_expansion_embed:
 		embed_expansion = "e"
